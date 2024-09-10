@@ -6,26 +6,25 @@
 
 
 from datetime import datetime as dt
-import swisseph as swe
 import datetime
-
-from scipy.stats import rankdata
-
-import pandas as pd
-import math
-from typing import Dict, Tuple
-
 from pathlib import Path
-
-
 import json
 
 
 
 
-#Generate Astrological data and plot charts
-ad = astrocalc.generate_astrodata(bd)
-#astrocalc.plot_astrocharts(astrodata,"./charts/")
+#请自行生成星盘数据
+bd = {"name"="huabolee"}
+ad={"[D1]":{
+    "planets":{
+        "Sun":{
+            "sign":"Cancer"
+            
+        }
+}
+    
+}
+   }
 
 
 
@@ -192,7 +191,7 @@ def calculate_dasha_years(ad):
 
 
         # 特殊处理：守护星与星座位于同一宫的情况
-        if interval == 0:
+        if interval == 1:
             interval = 12
         else:
             interval -= 1
@@ -432,7 +431,7 @@ dara_pada_position = calculate_dara_pada(ad)
 print(f"Dara Pada 位于第 {dara_pada_position} 星座")
 
 
-#DKN = D9中的位置；
+
 
     # 输出结果
    # print(chara_dashas)
