@@ -1,4 +1,5 @@
-#根据K.N.Rao Jaimini Chara Dasha计算方法编写程序：
+＃Chara Dasha是印度占星中，Jaimini体系的一种大运方法，程序仅供参考， 具体编程环境需要进一步确认修改
+#根据K.N.Rao Jaimini Chara Dasha计算方法编写程序
 ＃作者：李化波　电话：19140441333　微信：lihuabo9413 邮箱：lhb2715@163.com
 
 
