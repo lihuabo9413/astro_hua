@@ -1,0 +1,155 @@
+from datetime import datetime as dt
+import swisseph as swe
+import datetime
+import json
+
+# 定义行星ID常量
+MERCURY = swe.MERCURY
+VENUS = swe.VENUS
+MARS = swe.MARS
+JUPITER = swe.JUPITER
+SATURN = swe.SATURN
+URANUS = swe.URANUS
+NEPTUNE = swe.NEPTUNE
+PLUTO = swe.PLUTO
+SUN = swe.SUN
+MOON = swe.MOON
+EARTH = swe.EARTH
+
+def calculate_julian_day(date_time_obj: datetime.datetime, timezone: float) -> float:
+    """
+    计算考虑时区的Julian Day。
+    
+    参数:
+    - date_time_obj: datetime.datetime 对象
+    - timezone: 时区偏移（小时）
+    
+    返回:
+    - Julian Day
+    """
+    utc_dt = date_time_obj - datetime.timedelta(hours=timezone)
+    jd_epoch = 2451545.0  # 1st January 2000 12:00 noon (JD)
+    seconds_since_epoch = (utc_dt - datetime.datetime(2000, 1, 1, 12, 0)).total_seconds()
+    julian_day = jd_epoch + seconds_since_epoch / 86400
+    return julian_day
+
+def calculate_datetime_from_julian_day(julian_day: float, timezone: float) -> datetime.datetime:
+    """
+    将Julian Day转换回datetime对象，考虑时区。
+    
+    参数:
+    - julian_day: Julian Day
+    - timezone: 时区偏移（小时）
+    
+    返回:
+    - datetime.datetime 对象
+    """
+    jd_epoch = 2451545.0  # 1st January 2000 12:00 noon (JD)
+    seconds_since_epoch = (julian_day - jd_epoch) * 86400
+    utc_dt = datetime.datetime(2000, 1, 1, 12, 0) + datetime.timedelta(seconds=seconds_since_epoch)
+    local_dt = utc_dt + datetime.timedelta(hours=timezone)
+    return local_dt
+
+def search_planet_condition(bd):
+    """
+    查询行星速度，并判断静止行星。如果4天内发生处于静止状态，再罗列出前后四天的速度。
+    
+    参数:
+    - bd: 出生数据字典
+    
+    返回:
+    - 包含所有行星的速度信息和静止状态的字典。
+    """
+    dob = bd["DOB"]
+    tob = bd["TOB"]
+    pob = bd["POB"]
+
+    brithday = datetime.datetime(
+        int(dob["year"]), int(dob["month"]), int(dob["day"]),
+        int(tob["hour"]), int(tob["min"]), int(tob["sec"])
+    )
+    timezone = float(pob["timezone"])
+    brith_jd = calculate_julian_day(brithday, timezone)
+
+    set_ayanamsa_mode = lambda: swe.set_sid_mode(swe.SIDM_LAHIRI)
+    reset_ayanamsa_mode = lambda: swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
+    flags = swe.FLG_SPEED
+
+    planets_id = [2,3,4,5,6,7,8,9,11]  # 指定要分析的行星索引
+    step_days = 4
+    Yesterday = brith_jd - step_days
+    Tomorrow = brith_jd + step_days
+
+    results = {}
+
+    for planet in planets_id:
+        bd_planet_pos, vel = swe.calc_ut(brith_jd, planet, flags=swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL)[:6]
+        current_speed = bd_planet_pos[3]
+        planet_name = swe.get_planet_name(planet)
+        
+        # 存储出生时刻的行星速度
+        results.setdefault(planet_name, {})["speed_at_birth"] = {
+            "date": calculate_datetime_from_julian_day(brith_jd, timezone).isoformat(),
+            "speed": current_speed
+        }
+
+        speeds = []
+        for day in [Yesterday, brith_jd, Tomorrow]:
+            planet_pos, vel = swe.calc_ut(day, planet, flags=swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL)[:6]
+            speeds.append(planet_pos[3])
+
+        is_stationary = len(speeds) == 3 and speeds[0] * speeds[2] <= 0
+        stationary_direction = "静止直行" if speeds[0] < speeds[2] else "静止逆行"
+
+        if is_stationary:
+            results[planet_name]["is_stationary"] = True
+            results[planet_name]["direction"] = stationary_direction
+            results[planet_name]["speed_changes"] = []
+
+            for day in range(-4, 5):  # 前后各4天的速度变化
+                day_jd = brith_jd + day
+                planet_pos, vel = swe.calc_ut(day_jd, planet, flags=swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL)[:6]
+                speed_change = planet_pos[3]
+                results[planet_name]["speed_changes"].append({
+                    "date": calculate_datetime_from_julian_day(day_jd, timezone).isoformat(),
+                    "speed": speed_change
+                })
+        else:
+            results[planet_name]["is_stationary"] = False
+
+    return results
+
+# 自定义JSON编码器
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+'''
+# 示例调用
+bd_example = {
+    "name": "Trump, Donald",
+    "gender": "male",
+    "DOB": {
+        "year": '1946',
+        "month": '6',
+        "day": '14'
+    },
+    "TOB": {
+        "hour": '10',
+        "min": '54',
+        "sec": '0'
+    },
+    "POB": {
+        "name": 'Jamaica Hospital Queens',
+        "lat": '40.7',
+        "lon": '-73.81638888888888',
+        "timezone": "-4.0"
+    }
+}
+result = search_planet_condition(bd_example)
+
+# 格式化输出结果
+print(json.dumps(result, cls=CustomJSONEncoder, ensure_ascii=False, indent=4))
+'''
